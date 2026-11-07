@@ -553,6 +553,22 @@ class HardwarePatchsetDetection:
                 continue
             patches.update(item.patches())
 
+        # 'Monterey OpenCL' and 'Big Sur OpenCL' both MERGE the same target:
+        # /System/Library/Frameworks/OpenCL.framework
+        # Every patchset that chains 'Big Sur OpenCL' (Intel Ivy Bridge,
+        # Nvidia Kepler) also chains 'Monterey OpenCL' before it, and Intel
+        # Haswell (which only chains 'Monterey OpenCL') is processed after
+        # Ivy Bridge but before Nvidia Kepler in '_hardware_variants'.
+        # Therefore 'Big Sur OpenCL' always lands after 'Monterey OpenCL'
+        # in the merge order, and MERGE installs (rsync) overwrite the
+        # Monterey payload in full on every supported OS.
+        # Drop the shadowed entry so we skip the redundant framework copy
+        # and the recorded patch state reflects what actually lands on disk.
+        # Note: on Tahoe+ mixed Haswell/Kepler machines, 'Nvidia Kepler OpenCL'
+        # is a separate entry applied after 'Big Sur OpenCL' and is unaffected.
+        if "Big Sur OpenCL" in patches and "Monterey OpenCL" in patches:
+            del patches["Monterey OpenCL"]
+
         _cant_patch = not self._can_patch(requirements)
 
         requirements[HardwarePatchsetValidation.PATCHING_NOT_POSSIBLE]   = _cant_patch
